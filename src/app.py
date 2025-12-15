@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import RedirectResponse
 from fastapi.responses import HTMLResponse, FileResponse
 from pathlib import Path
 import shutil
@@ -86,24 +87,17 @@ def dashboard():
 
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
-    # Save uploaded file
     img_path = RAW_DIR / file.filename
+
     with open(img_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # -----------------------------
-    # MOCK OCR ENGINE (Cloud-safe)
-    # -----------------------------
+    # MOCK OUTPUT (Render-safe, deployment-safe)
     ocr_df = pd.DataFrame({
         "file": [file.filename],
-        "extracted_text": [
-            "Digitized successfully by FinVision AI (cloud-safe engine)"
-        ]
+        "text": ["Processed successfully on FinVision AI"]
     })
 
-    # -----------------------------
-    # MOCK PAYMENT ENGINE
-    # -----------------------------
     payment_df = pd.DataFrame({
         "file": [file.filename],
         "signature_present": [True],
@@ -112,11 +106,11 @@ async def upload_image(file: UploadFile = File(...)):
         "payable": [True]
     })
 
-    # Save Excel outputs
     ocr_df.to_excel(OCR_FILE, index=False)
     payment_df.to_excel(PAYMENT_FILE, index=False)
 
-    return {"status": "success"}
+    # 🔁 Redirect back to dashboard after processing
+    return RedirectResponse(url="/", status_code=303)
 
 
 @app.get("/download/ocr")
