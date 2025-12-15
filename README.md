@@ -67,7 +67,7 @@ Copy code
 ## ▶️ How to Run
 
 ### 1️⃣ Activate Environment
-```bash
+
 conda activate agentic_ai
 2️⃣ Run OCR Pipeline
 bash
