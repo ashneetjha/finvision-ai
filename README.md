@@ -69,15 +69,15 @@ Copy code
 ### 1️⃣ Activate Environment
 
 conda activate agentic_ai
-2️⃣ Run OCR Pipeline
+### 2️⃣ Run OCR Pipeline
 bash
 Copy code
 python src/ocr_pipeline.py
-3️⃣ Run Payment Engine
+### 3️⃣ Run Payment Engine
 bash
 Copy code
 python src/payment_engine.py
-4️⃣ Open Excel Dashboard
+### 4️⃣ Open Excel Dashboard
 Open files inside:
 
 bash
