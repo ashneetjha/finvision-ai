@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from pathlib import Path
 import shutil
 import subprocess
@@ -13,62 +13,57 @@ OUT_DIR = BASE_DIR / "data" / "output"
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+OCR_FILE = OUT_DIR / "ocr.xlsx"
+PAYMENT_FILE = OUT_DIR / "payments.xlsx"
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard():
     return """
-    <!DOCTYPE html>
     <html>
     <head>
         <title>FinVision AI</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body {
-                font-family: Arial;
-                background: #0f172a;
-                color: white;
-                padding: 20px;
-            }
-            .card {
-                background: #1e293b;
-                padding: 20px;
-                border-radius: 12px;
-                max-width: 400px;
-                margin: auto;
-            }
-            button {
-                background: #38bdf8;
-                border: none;
-                padding: 10px;
-                width: 100%;
-                border-radius: 8px;
-                font-size: 16px;
-            }
+            body { font-family: Arial; background:#0f172a; color:white; text-align:center; }
+            .box { margin-top:60px; }
+            button { padding:12px 20px; font-size:16px; }
         </style>
     </head>
     <body>
-        <div class="card">
-            <h2>FinVision AI</h2>
-            <p>Upload a document to process OCR & payment validation.</p>
+        <div class="box">
+            <h1>FinVision AI</h1>
             <form action="/upload" method="post" enctype="multipart/form-data">
-                <input type="file" name="file" required><br><br>
-                <button type="submit">Process</button>
+                <input type="file" name="file" required>
+                <br><br>
+                <button type="submit">Upload & Process</button>
             </form>
         </div>
     </body>
     </html>
     """
 
+
 @app.post("/upload")
-async def upload(file: UploadFile = File(...)):
+async def upload_image(file: UploadFile = File(...)):
     img_path = RAW_DIR / file.filename
     with open(img_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    subprocess.run(["python", "src/ocr_pipeline.py"])
-    subprocess.run(["python", "src/payment_engine.py"])
+    subprocess.run(["python", "src/ocr_pipeline.py"], check=True)
+    subprocess.run(["python", "src/payment_engine.py"], check=True)
 
     return {
         "status": "success",
-        "ocr": "data/output/ocr.xlsx",
-        "payments": "data/output/payments.xlsx"
+        "ocr": "/download/ocr",
+        "payments": "/download/payments"
     }
+
+
+@app.get("/download/ocr")
+def download_ocr():
+    return FileResponse(OCR_FILE, filename="ocr.xlsx")
+
+
+@app.get("/download/payments")
+def download_payments():
+    return FileResponse(PAYMENT_FILE, filename="payments.xlsx")
