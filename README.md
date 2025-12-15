@@ -83,3 +83,21 @@ Open files inside:
 bash
 Copy code
 data/output/
+
+### 📊 Output Example
+
+Digitized text in Excel
+
+Signature detected: TRUE/FALSE
+
+Payment decision: PAYABLE / NOT PAYABLE
+
+### 🔮 Future Enhancements
+
+Deep-learning-based signature detection
+
+Multi-page PDF handling
+
+Role-based approval workflows
+
+REST API for enterprise integration
