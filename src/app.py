@@ -20,7 +20,7 @@ def dashboard():
     <html>
     <head>
         <title>FinVision AI</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
             body {
                 font-family: Arial;
@@ -28,32 +28,30 @@ def dashboard():
                 color: white;
                 padding: 20px;
             }
-            .box {
-                background: #111827;
+            .card {
+                background: #1e293b;
                 padding: 20px;
-                border-radius: 10px;
+                border-radius: 12px;
                 max-width: 400px;
                 margin: auto;
             }
-            input, button {
-                width: 100%;
-                padding: 10px;
-                margin-top: 10px;
-                border-radius: 6px;
-            }
             button {
-                background: #2563eb;
-                color: white;
+                background: #38bdf8;
                 border: none;
+                padding: 10px;
+                width: 100%;
+                border-radius: 8px;
+                font-size: 16px;
             }
         </style>
     </head>
     <body>
-        <div class="box">
+        <div class="card">
             <h2>FinVision AI</h2>
+            <p>Upload a document to process OCR & payment validation.</p>
             <form action="/upload" method="post" enctype="multipart/form-data">
-                <input type="file" name="file" required />
-                <button type="submit">Upload & Process</button>
+                <input type="file" name="file" required><br><br>
+                <button type="submit">Process</button>
             </form>
         </div>
     </body>
@@ -61,7 +59,7 @@ def dashboard():
     """
 
 @app.post("/upload")
-async def upload_image(file: UploadFile = File(...)):
+async def upload(file: UploadFile = File(...)):
     img_path = RAW_DIR / file.filename
     with open(img_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -70,10 +68,7 @@ async def upload_image(file: UploadFile = File(...)):
     subprocess.run(["python", "src/payment_engine.py"])
 
     return {
-        "status": "processed",
-        "file": file.filename,
-        "outputs": [
-            "data/output/ocr.xlsx",
-            "data/output/payments.xlsx"
-        ]
+        "status": "success",
+        "ocr": "data/output/ocr.xlsx",
+        "payments": "data/output/payments.xlsx"
     }
