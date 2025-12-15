@@ -1,7 +1,6 @@
 fastapi
 uvicorn
-python-multipart
 pandas
-opencv-python
-pytesseract
 openpyxl
+google-cloud-vision
+python-multipart

@@ -16,6 +16,7 @@ PAYMENT_FILE = OUT_DIR / "payments.xlsx"
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard():
     return """
@@ -82,19 +83,27 @@ def dashboard():
     </html>
     """
 
+
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
+    # Save uploaded file
     img_path = RAW_DIR / file.filename
-
     with open(img_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # MOCK OUTPUT (Render-safe)
+    # -----------------------------
+    # MOCK OCR ENGINE (Cloud-safe)
+    # -----------------------------
     ocr_df = pd.DataFrame({
         "file": [file.filename],
-        "text": ["Processed successfully on FinVision AI"]
+        "extracted_text": [
+            "Digitized successfully by FinVision AI (cloud-safe engine)"
+        ]
     })
 
+    # -----------------------------
+    # MOCK PAYMENT ENGINE
+    # -----------------------------
     payment_df = pd.DataFrame({
         "file": [file.filename],
         "signature_present": [True],
@@ -103,19 +112,30 @@ async def upload_image(file: UploadFile = File(...)):
         "payable": [True]
     })
 
+    # Save Excel outputs
     ocr_df.to_excel(OCR_FILE, index=False)
     payment_df.to_excel(PAYMENT_FILE, index=False)
 
     return {"status": "success"}
 
+
 @app.get("/download/ocr")
 def download_ocr():
     if not OCR_FILE.exists():
         return {"error": "OCR file not found"}
-    return FileResponse(OCR_FILE, filename="ocr.xlsx")
+    return FileResponse(
+        OCR_FILE,
+        filename="ocr.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
 
 @app.get("/download/payments")
 def download_payments():
     if not PAYMENT_FILE.exists():
         return {"error": "Payments file not found"}
-    return FileResponse(PAYMENT_FILE, filename="payments.xlsx")
+    return FileResponse(
+        PAYMENT_FILE,
+        filename="payments.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
