@@ -18,68 +18,76 @@
 
         .container {
             background: #020617;
-            padding: 30px;
-            border-radius: 16px;
+            padding: 32px;
+            border-radius: 18px;
             width: 100%;
-            max-width: 420px;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+            max-width: 440px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
             text-align: center;
         }
 
         h1 {
             color: #38bdf8;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
         }
 
         p {
             font-size: 14px;
             opacity: 0.9;
-            margin-bottom: 20px;
+            margin-bottom: 22px;
+        }
+
+        .section {
+            margin-bottom: 18px;
         }
 
         input[type="file"] {
             width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
+            padding: 12px;
             background: #0f172a;
             color: white;
             border: 1px solid #334155;
-            border-radius: 8px;
+            border-radius: 10px;
         }
 
         button {
             width: 100%;
-            padding: 12px;
+            padding: 13px;
             background: #38bdf8;
             border: none;
-            border-radius: 10px;
+            border-radius: 12px;
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
+            margin-top: 12px;
         }
 
         button:hover {
             background: #0ea5e9;
         }
 
-        .links {
-            margin-top: 20px;
+        .secondary-btn {
+            background: #22c55e;
+            margin-top: 10px;
+        }
+
+        video, canvas, img {
+            width: 100%;
+            border-radius: 12px;
+            margin-top: 10px;
+            border: 1px solid #334155;
         }
 
         .links a {
             display: block;
-            margin-top: 10px;
+            margin-top: 12px;
             color: #22c55e;
             font-weight: bold;
             text-decoration: none;
         }
 
-        .links a:hover {
-            text-decoration: underline;
-        }
-
         #status {
-            margin-top: 15px;
+            margin-top: 14px;
             font-size: 14px;
             color: #facc15;
         }
@@ -92,14 +100,28 @@
     <h1>📊 FinVision AI</h1>
     <p>Agentic AI for Document Digitization & Financial Validation</p>
 
-    <!-- IMPORTANT: stays on same page -->
-    <form id="uploadForm" enctype="multipart/form-data">
-        <input type="file" name="file" required>
-        <button type="submit">Upload & Process</button>
-    </form>
+    <!-- FILE UPLOAD -->
+    <div class="section">
+        <form id="uploadForm" enctype="multipart/form-data">
+            <input type="file" name="file" accept="image/*" required>
+            <button type="submit">Upload & Process</button>
+        </form>
+    </div>
+
+    <!-- CAMERA CAPTURE -->
+    <div class="section">
+        <button class="secondary-btn" onclick="startCamera()">📷 Open Camera</button>
+        <video id="camera" autoplay playsinline style="display:none;"></video>
+        <canvas id="snapshot" style="display:none;"></canvas>
+        <img id="preview" style="display:none;" />
+        <button class="secondary-btn" onclick="capturePhoto()" id="captureBtn" style="display:none;">
+            Capture & Process
+        </button>
+    </div>
 
     <div id="status"></div>
 
+    <!-- DOWNLOAD LINKS -->
     <div class="links">
         <a href="/download/ocr" target="_blank">⬇ Download OCR Excel</a>
         <a href="/download/payments" target="_blank">⬇ Download Payments Excel</a>
@@ -109,7 +131,12 @@
 <script>
     const form = document.getElementById("uploadForm");
     const statusDiv = document.getElementById("status");
+    const video = document.getElementById("camera");
+    const canvas = document.getElementById("snapshot");
+    const preview = document.getElementById("preview");
+    const captureBtn = document.getElementById("captureBtn");
 
+    // FILE UPLOAD
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
         statusDiv.innerText = "⏳ Processing document...";
@@ -117,20 +144,52 @@
         const formData = new FormData(form);
 
         try {
-            const response = await fetch("/upload", {
-                method: "POST",
-                body: formData
-            });
-
-            if (response.ok) {
-                statusDiv.innerText = "✅ Processing complete. Download files below.";
-            } else {
-                statusDiv.innerText = "❌ Processing failed.";
-            }
-        } catch (err) {
+            const res = await fetch("/upload", { method: "POST", body: formData });
+            statusDiv.innerText = res.ok
+                ? "✅ Processing complete. Download files below."
+                : "❌ Processing failed.";
+        } catch {
             statusDiv.innerText = "❌ Server error.";
         }
     });
+
+    // CAMERA
+    async function startCamera() {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }
+        });
+        video.srcObject = stream;
+        video.style.display = "block";
+        captureBtn.style.display = "block";
+    }
+
+    async function capturePhoto() {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0);
+
+        canvas.toBlob(async (blob) => {
+            preview.src = URL.createObjectURL(blob);
+            preview.style.display = "block";
+
+            statusDiv.innerText = "⏳ Processing captured image...";
+
+            const formData = new FormData();
+            formData.append("file", blob, "camera_capture.png");
+
+            try {
+                const res = await fetch("/upload", {
+                    method: "POST",
+                    body: formData
+                });
+                statusDiv.innerText = res.ok
+                    ? "✅ Processing complete. Download files below."
+                    : "❌ Processing failed.";
+            } catch {
+                statusDiv.innerText = "❌ Server error.";
+            }
+        }, "image/png");
+    }
 </script>
 
 </body>
