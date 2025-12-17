@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+env/
+venv/
+.venv/
+agentic_ai/
+iocl_py310/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Data outputs (DO NOT commit generated files)
+data/raw/*
+data/output/*
+!data/raw/.gitkeep
+!data/output/.gitkeep
+
+# Logs
+*.log
+
+# Excel temp files
+~$*.xlsx
+
+# Secrets (future-proofing)
+.env
