@@ -3,6 +3,8 @@ from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from pathlib import Path
 import shutil
 import pandas as pd
+from datetime import datetime
+import random
 
 app = FastAPI(title="FinVision AI")
 
@@ -81,7 +83,7 @@ def dashboard():
 </html>
 """
 
-# ---------------- UPLOAD ENGINE ----------------
+# ---------------- UPLOAD ----------------
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
     img_path = RAW_DIR / file.filename
@@ -89,43 +91,51 @@ async def upload_image(file: UploadFile = File(...)):
     with open(img_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # DEPLOYMENT-SAFE MOCK PROCESSING
-    ocr_df = pd.DataFrame({
-        "file": [file.filename],
-        "text": ["Processed successfully on FinVision AI"]
-    })
+    upload_time = datetime.utcnow()
 
-    payment_df = pd.DataFrame({
-        "file": [file.filename],
-        "signature_present": [True],
-        "ink_fraction": [0.52],
-        "amount": [1000],
-        "payable": [True]
-    })
+    # -------- OCR SIMULATION --------
+    sample_lines = [
+        "Indian Oil Corporation Limited",
+        "Invoice No: IOCL-2024-INV-001",
+        "Total Amount Payable: ₹1000",
+        "Authorized Signature"
+    ]
+
+    ocr_rows = []
+    for i, line in enumerate(sample_lines, start=1):
+        ocr_rows.append({
+            "file": file.filename,
+            "page_no": 1,
+            "line_no": i,
+            "extracted_text": line,
+            "confidence": round(random.uniform(0.90, 0.99), 2),
+            "timestamp": upload_time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+
+    ocr_df = pd.DataFrame(ocr_rows)
+
+    # -------- PAYMENT ENGINE --------
+    payment_df = pd.DataFrame([{
+        "file": file.filename,
+        "invoice_no": "IOCL-2024-INV-001",
+        "amount_detected": 1000,
+        "currency": "INR",
+        "signature_present": True,
+        "fraud_risk_score": 0.08,
+        "final_status": "APPROVED",
+        "processed_utc": upload_time.strftime("%Y-%m-%d %H:%M:%S")
+    }])
 
     ocr_df.to_excel(OCR_FILE, index=False)
     payment_df.to_excel(PAYMENT_FILE, index=False)
 
-    # 🔁 THIS IS THE KEY FIX
     return RedirectResponse(url="/", status_code=303)
 
 # ---------------- DOWNLOADS ----------------
 @app.get("/download/ocr")
 def download_ocr():
-    if not OCR_FILE.exists():
-        return {"error": "OCR file not found"}
-    return FileResponse(
-        OCR_FILE,
-        filename="ocr.xlsx",
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    return FileResponse(OCR_FILE, filename="ocr.xlsx")
 
 @app.get("/download/payments")
 def download_payments():
-    if not PAYMENT_FILE.exists():
-        return {"error": "Payments file not found"}
-    return FileResponse(
-        PAYMENT_FILE,
-        filename="payments.xlsx",
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    return FileResponse(PAYMENT_FILE, filename="payments.xlsx")
