@@ -1,103 +1,104 @@
-# FinVision AI 🚀  
-### Agentic AI for Document Digitization, Signature Validation & Financial Decision Automation
+# FinVision AI  
+### Agentic AI System for Document Digitization & Payment Validation
 
-FinVision AI is an **end-to-end AI system** that transforms physical financial documents into structured digital intelligence and automatically determines payment eligibility based on audit validation rules.
-
----
-
-## 🔍 Problem Statement
-Manual processing of audit documents is:
-- Time-consuming
-- Error-prone
-- Difficult to scale
-- Hard to audit
-
-FinVision AI solves this by combining **Computer Vision + Rule-based Intelligence** to automate document verification and financial decisions.
+FinVision AI is an agentic AI–based decision-support system designed to digitize financial documents, evaluate audit readiness, and generate executive-grade reports to assist payment validation workflows in enterprise and PSU environments.
 
 ---
 
-## 🧠 System Capabilities
-- OCR-based document digitization
-- Signature presence validation
-- Automated payment eligibility decision
-- Excel-native dashboards (enterprise friendly)
-- Modular & extensible architecture
+## 🔹 Project Objectives
+
+- Convert physical documents into structured digital data
+- Perform OCR using machine learning models
+- Assess data quality and audit readiness
+- Support payment decision-making (without auto-payment)
+- Generate management-ready Excel dashboards
+- Ensure deployment safety on free-tier infrastructure
 
 ---
 
-## 🏗️ Project Architecture
+## 🔹 System Architecture (Agentic Design)
 
-finvision-ai/
-│
-├── src/
-│ ├── config.py
-│ ├── ocr_pipeline.py
-│ ├── payment_engine.py
-│ └── excel_dashboard.py
-│
-├── data/
-│ ├── raw/ # Input document images
-│ └── output/ # Excel outputs & dashboards
-│
-└── README.md
+The system is structured as independent agents:
 
-yaml
-Copy code
+| Agent | Responsibility |
+|-----|---------------|
+| OCR Agent | Extracts text using EasyOCR with image preprocessing |
+| Audit Agent | Signature presence, amount extraction, risk scoring |
+| Evaluation Agent | OCR accuracy benchmarking |
+| Reporting Agent | Executive Excel dashboard generation |
+| Application Layer | Orchestrates agents via FastAPI |
+
+This separation improves explainability, auditability, and maintainability.
 
 ---
 
-## ⚙️ Tech Stack
+## 🔹 End-to-End Workflow
 
-**Core**
+1. User uploads document (file or camera)
+2. OCR agent extracts structured text
+3. Data quality metrics are computed
+4. Audit agent evaluates payment readiness
+5. Reporting agent generates Excel dashboards
+6. Outputs are available for download via UI
+
+---
+
+## 🔹 Outputs Generated
+
+- `ocr.xlsx` – OCR text with confidence scores  
+- `payments.xlsx` – Audit and payment decision records  
+- `finvision_dashboard.xlsx` – Executive review dashboard  
+
+---
+
+## 🔹 Executive Dashboard Contents
+
+- Executive Summary (KPIs)
+- Payment Decisions (actionable table)
+- Risk Analysis
+- OCR Quality Metrics
+- Raw Data for traceability
+
+---
+
+## 🔹 Deployment
+
+- Backend: FastAPI
+- Hosting: Render (Free Tier)
+- No GPU, no paid services
+- CPU-only, deployment-safe libraries
+
+---
+
+## 🔹 Limitations
+
+- OCR accuracy depends on document quality
+- Signature detection is heuristic-based
+- Amount extraction uses rule-based logic
+- Fraud risk scoring is simulated
+- No authentication or role-based access
+
+These are documented and considered future enhancement areas.
+
+---
+
+## 🔹 Future Enhancements
+
+- Domain-specific OCR fine-tuning
+- NLP-based amount extraction
+- Signature classification models
+- Human-in-the-loop feedback integration
+- Role-based access and logging
+- Enhanced evaluation datasets
+
+---
+
+## 🔹 Tech Stack
+
 - Python 3.10
+- FastAPI
+- EasyOCR
 - OpenCV
-- Tesseract OCR
-- Pandas
-- NumPy
+- Pandas, OpenPyXL
+- HTML, CSS, JavaScript
 
-**Analytics**
-- Microsoft Excel (Dashboards, Charts)
-
-**DevOps**
-- Git & GitHub
-- Conda Environment
-
----
-
-## ▶️ How to Run
-
-### 1️⃣ Activate Environment
-
-conda activate agentic_ai
-### 2️⃣ Run OCR Pipeline
-bash
-Copy code
-python src/ocr_pipeline.py
-### 3️⃣ Run Payment Engine
-bash
-Copy code
-python src/payment_engine.py
-### 4️⃣ Open Excel Dashboard
-Open files inside:
-
-bash
-Copy code
-data/output/
-
-### 📊 Output Example
-
-Digitized text in Excel
-
-Signature detected: TRUE/FALSE
-
-Payment decision: PAYABLE / NOT PAYABLE
-
-### 🔮 Future Enhancements
-
-Deep-learning-based signature detection
-
-Multi-page PDF handling
-
-Role-based approval workflows
-
-REST API for enterprise integration
