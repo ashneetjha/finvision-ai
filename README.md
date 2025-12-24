@@ -98,7 +98,7 @@ These are documented and considered future enhancement areas.
 - Python 3.10
 - FastAPI
 - EasyOCR
-- OpenCV
+- OpenCV (Headless for easy deployability)
 - Pandas, OpenPyXL
 - HTML, CSS, JavaScript
 
