@@ -1,87 +1,84 @@
-import cv2
+import pandas as pd
 import numpy as np
-from pathlib import Path
+# Switched from cv2 to PIL to prevent DLL/Installation errors
+from PIL import Image, ImageOps
 
-# ---------------- AUDIT AGENT (DECISION + COMPLIANCE) ----------------
+class AuditAgent:
+    def __init__(self):
+        pass
 
-def _detect_signature_and_ink(image_path):
-    """
-    Detects ink density and infers signature presence.
-    Deterministic, explainable, audit-safe.
-    """
+    def _detect_ink_density(self, image_path):
+        """
+        Detects ink density using PIL (Pillow) instead of OpenCV.
+        This prevents the 'DLL load failed' error.
+        """
+        try:
+            # 1. Open Image
+            with Image.open(image_path) as img:
+                # 2. Convert to Grayscale (L mode)
+                gray = ImageOps.grayscale(img)
+                
+                # 3. Binarize (Thresholding)
+                # Any pixel < 150 becomes 0 (Black/Ink), else 255 (White/Paper)
+                # We count the black pixels.
+                histogram = gray.histogram()
+                
+                # Sum of pixels with value < 150 (Dark pixels)
+                ink_pixels = sum(histogram[:150])
+                total_pixels = gray.width * gray.height
 
-    signature_present = False
-    ink_density_score = 0.0
+                if total_pixels == 0:
+                    return False, 0.0
 
-    img = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
-    if img is None:
-        return signature_present, ink_density_score
+                ink_density_score = round(ink_pixels / total_pixels, 4)
 
-    # Binary threshold to isolate ink regions
-    _, binary = cv2.threshold(img, 150, 255, cv2.THRESH_BINARY_INV)
+                # Heuristic: If ink density > 1%, likely contains a signature/stamp
+                signature_present = ink_density_score >= 0.01
 
-    ink_pixels = np.count_nonzero(binary)
-    total_pixels = binary.size
+                return signature_present, ink_density_score
+                
+        except Exception as e:
+            print(f" [Audit Agent] Ink detection error: {e}")
+            return False, 0.0
 
-    ink_density_score = round(ink_pixels / total_pixels, 4)
+    def audit_dataframe(self, df, image_path=None):
+        """
+        Main Function called by App.py.
+        """
+        print(" [Audit Agent] Validating financial logs...")
+        
+        # 1. Image Level Audit (Physical Signature)
+        sig_present = False
+        ink_score = 0.0
+        if image_path:
+            sig_present, ink_score = self._detect_ink_density(image_path)
+            print(f" [Audit Agent] Image Analysis: Signature={'Yes' if sig_present else 'No'} (Density: {ink_score})")
 
-    # Heuristic threshold (tunable, explainable)
-    signature_present = ink_density_score >= 0.01
+        if df.empty:
+            return df, {"total": 0, "risk": 0, "safe": 0, "ink_score": ink_score}
 
-    return signature_present, ink_density_score
+        # 2. Row Level Audit (Data Integrity)
+        def check_row_risk(row):
+            for val in row:
+                s_val = str(val).strip().lower()
+                # Check for missing values, NaNs, or explicit "None" strings
+                if s_val in ['', 'nan', 'none', 'null']:
+                    return "Risk (Unsigned/Empty)"
+            return "Verified"
 
-
-def evaluate_payment(file_name, ocr_df, avg_confidence, processed_time):
-    """
-    Audit Agent:
-    - Signature & ink validation
-    - Amount extraction
-    - Fraud risk estimation
-    - Final payment decision (NO auto-approval)
-    """
-
-    # ---------------- SIGNATURE / INK ANALYSIS ----------------
-    image_path = Path(__file__).resolve().parents[2] / "data" / "raw" / file_name
-    signature_present, ink_density_score = _detect_signature_and_ink(image_path)
-
-    # ---------------- AMOUNT EXTRACTION (OCR-ASSISTED) ----------------
-    detected_amount = 0
-
-    for text in ocr_df["extracted_text"]:
-        digits = "".join(ch for ch in text if ch.isdigit())
-        if len(digits) >= 3:
-            detected_amount = int(digits)
-            break
-
-    # ---------------- AUDIT DECISION LOGIC ----------------
-    audit_remarks = []
-    final_status = "ON_HOLD"
-    fraud_risk_score = 0.0
-
-    if not signature_present:
-        audit_remarks.append("Signature missing or ink density below threshold")
-
-    if avg_confidence < 0.6:
-        audit_remarks.append("Low OCR confidence")
-
-    if detected_amount <= 0:
-        audit_remarks.append("Amount not reliably detected")
-
-    if not audit_remarks:
-        final_status = "READY_FOR_PAYMENT"
-        fraud_risk_score = 0.02
-    else:
-        fraud_risk_score = round(0.3 + (0.1 * len(audit_remarks)), 2)
-
-    return {
-        "file_name": file_name,
-        "amount_detected": detected_amount,
-        "currency": "INR",
-        "signature_present": signature_present,
-        "ink_density_score": ink_density_score,
-        "avg_ocr_confidence": avg_confidence,
-        "fraud_risk_score": fraud_risk_score,
-        "final_status": final_status,
-        "audit_remarks": "; ".join(audit_remarks),
-        "processed_utc": processed_time
-    }
+        df["Audit Status"] = df.apply(check_row_risk, axis=1)
+        
+        # 3. Calculate Stats for the Dashboard
+        total = len(df)
+        risk_count = len(df[df["Audit Status"] == "Risk (Unsigned/Empty)"])
+        safe_count = total - risk_count
+        
+        stats = {
+            "total_rows": total,
+            "unsigned_count": risk_count, 
+            "verified_count": safe_count,
+            "signature_detected": sig_present,
+            "ink_density": ink_score
+        }
+        
+        return df, stats

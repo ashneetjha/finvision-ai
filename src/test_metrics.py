@@ -1,21 +1,84 @@
+import sys
+import os
 from pathlib import Path
-from src.agents.evaluation_agent import character_accuracy, word_accuracy
+import pandas as pd
+import Levenshtein  # pip install python-Levenshtein
 
-# ---------------- OFFLINE OCR EVALUATION SCRIPT ----------------
+# ---------------- PATH FIX ----------------
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
 
-ocr_output = """
-Table name daily historcal stoci prices volumes
-Date Open High Close Last Volume
-01Doi7 21.325.440
-01/032017 62.58 20,655.190
-...
-"""
+from src.agents.ocr_agent import OCRAgent
 
-gt_path = Path("data/ground_truth/sample1.txt")
-ground_truth = gt_path.read_text(encoding="utf-8")
+# ---------------- CONFIGURATION ----------------
+RAW_DIR = ROOT / "data" / "raw"
+GT_DIR = ROOT / "data" / "ground_truth"
 
-char_acc = character_accuracy(ocr_output, ground_truth)
-word_acc = word_accuracy(ocr_output, ground_truth)
+def load_ground_truth(filename):
+    base_name = os.path.splitext(filename)[0]
+    gt_path = GT_DIR / f"{base_name}.txt"
+    if not gt_path.exists():
+        return None
+    with open(gt_path, "r", encoding="utf-8") as f:
+        return f.read().strip()
 
-print(f"Character Accuracy: {char_acc:.2f} %")
-print(f"Word Accuracy: {word_acc:.2f} %")
+def calculate_accuracy(ocr_text, gt_text):
+    if not gt_text: return 0.0, 0.0
+
+    # 1. Character Accuracy
+    char_dist = Levenshtein.distance(ocr_text, gt_text)
+    char_acc = max(0, (1 - char_dist / len(gt_text))) * 100
+
+    # 2. Word Accuracy (Set Intersection Method - Fairer for Tables)
+    # This ignores "order" and checks if the correct words exist ANYWHERE
+    ocr_words = set(ocr_text.split())
+    gt_words = set(gt_text.split())
+    
+    common = ocr_words.intersection(gt_words)
+    word_acc = (len(common) / len(gt_words)) * 100 if gt_words else 0
+
+    return round(char_acc, 2), round(word_acc, 2)
+
+def run_test():
+    print("\n" + "="*50)
+    print(" 📊 FINVISION AI - DIAGNOSTIC ACCURACY TEST")
+    print("="*50)
+
+    try:
+        agent = OCRAgent()
+    except Exception as e:
+        print(f"❌ Failed: {e}")
+        return
+
+    files = [f for f in os.listdir(RAW_DIR) if f.lower().endswith(('.png', '.jpg'))]
+    
+    for file in files:
+        print(f"\n 🔹 Testing: {file}")
+        
+        file_path = RAW_DIR / file
+        df = agent.extract_structured_data(file_path)
+        
+        # Flatten and Clean
+        extracted_text = " ".join(df.astype(str).values.flatten())
+        extracted_text = " ".join(extracted_text.split()) 
+
+        gt_text = load_ground_truth(file)
+
+        if gt_text:
+            gt_text = " ".join(gt_text.split())
+            c_acc, w_acc = calculate_accuracy(extracted_text, gt_text)
+            
+            print(f"    ✅ Char Acc: {c_acc}% | Word Acc (Bag-of-Words): {w_acc}%")
+            
+            # --- DEBUG VIEW: SHOW ME THE DIFFERENCE ---
+            print("\n   COMPARISON (First 100 chars):")
+            print(f"    [EXPECTED]: {gt_text[:100]}...")
+            print(f"    [ACTUAL]  : {extracted_text[:100]}...")
+            print("-" * 50)
+        else:
+            print(f"    ⚠️ Skipped (No .txt found)")
+
+if __name__ == "__main__":
+    run_test()

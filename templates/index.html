@@ -2,267 +2,330 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>FinVision AI</title>
+    <title>FinVision AI | IOCL Audit System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            box-sizing: border-box;
+        :root {
+            --iocl-blue: #003366;
+            --iocl-orange: #F47920;
+            --light-bg: #f4f6f9;
+            --white: #ffffff;
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
         }
+
+        * { box-sizing: border-box; }
 
         body {
             margin: 0;
-            font-family: "Segoe UI", Arial, sans-serif;
-            background: linear-gradient(135deg, #020617, #0f172a);
-            color: white;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-dark);
             min-height: 100vh;
-        }
-
-        .page {
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 24px;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 1100px;
-            background: #020617;
-            border-radius: 20px;
-            box-shadow: 0 25px 60px rgba(0,0,0,0.6);
-            padding: 32px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 32px;
-        }
-
-        /* LEFT PANEL */
-        .left {
             display: flex;
             flex-direction: column;
-            justify-content: center;
         }
 
-        h1 {
-            font-size: 32px;
-            color: #38bdf8;
-            margin-bottom: 6px;
+        /* --- Header --- */
+        header {
+            background-color: var(--white);
+            border-bottom: 4px solid var(--iocl-orange);
+            padding: 15px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .logo-area { display: flex; align-items: center; gap: 15px; }
+        .logo-text h1 { margin: 0; font-size: 24px; color: var(--iocl-blue); font-weight: 800; }
+        .logo-text p { margin: 0; font-size: 13px; color: var(--text-gray); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .badge { background: var(--iocl-orange); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+
+        /* --- Main Layout --- */
+        .main-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+            width: 100%;
         }
 
-        p.subtitle {
-            font-size: 15px;
-            opacity: 0.9;
-            margin-bottom: 28px;
+        /* --- Cards --- */
+        .card {
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #e2e8f0;
         }
 
-        .section {
-            margin-bottom: 18px;
-        }
+        h2 { margin-top: 0; color: var(--iocl-blue); font-size: 18px; border-bottom: 2px solid #f1f5f9; padding-bottom: 15px; margin-bottom: 20px; }
 
+        /* --- Forms & Buttons --- */
+        .input-group { margin-bottom: 20px; }
+        
         input[type="file"] {
             width: 100%;
             padding: 12px;
-            background: #0f172a;
-            color: white;
-            border: 1px solid #334155;
-            border-radius: 10px;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            background: #f8fafc;
+            cursor: pointer;
+            transition: 0.2s;
         }
+        input[type="file"]:hover { border-color: var(--iocl-blue); background: #f1f5f9; }
 
-        button {
+        .btn {
             width: 100%;
             padding: 14px;
-            background: #38bdf8;
             border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: bold;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
             cursor: pointer;
-            margin-top: 12px;
-        }
-
-        button:hover {
-            background: #0ea5e9;
-        }
-
-        .secondary-btn {
-            background: #22c55e;
-        }
-
-        .secondary-btn:hover {
-            background: #16a34a;
-        }
-
-        #status {
-            margin-top: 14px;
-            font-size: 14px;
-            color: #facc15;
-        }
-
-        /* RIGHT PANEL */
-        .right {
-            background: #020617;
-            border: 1px solid #1e293b;
-            border-radius: 16px;
-            padding: 24px;
+            transition: all 0.2s;
             display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
-        .preview-box {
-            text-align: center;
+        .btn-primary { background-color: var(--iocl-blue); color: white; }
+        .btn-primary:hover { background-color: #002244; transform: translateY(-1px); }
+
+        .btn-secondary { background-color: var(--iocl-orange); color: white; margin-top: 15px; }
+        .btn-secondary:hover { background-color: #d66010; transform: translateY(-1px); }
+
+        /* --- Status --- */
+        #status-box {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f1f5f9;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-gray);
+            border-left: 4px solid var(--text-gray);
         }
 
-        video, canvas, img {
-            width: 100%;
-            border-radius: 12px;
-            border: 1px solid #334155;
+        /* --- Preview Area --- */
+        .preview-area {
+            background: #000;
+            border-radius: 8px;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+        }
+        video, img { width: 100%; height: 100%; object-fit: contain; }
+        .placeholder-text { color: #64748b; font-size: 14px; }
+
+        /* --- Download Section --- */
+        .download-grid {
+            display: none; /* Hidden initially */
+            grid-template-columns: 1fr;
+            gap: 12px;
             margin-top: 10px;
         }
 
-        .downloads a {
-            display: block;
-            margin-top: 14px;
-            padding: 12px;
-            border-radius: 10px;
-            text-align: center;
+        .dl-btn {
             text-decoration: none;
-            font-weight: bold;
-            color: white;
-            background: #0f172a;
-            border: 1px solid #334155;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: 0.2s;
         }
 
-        .downloads a:hover {
-            background: #1e293b;
-        }
+        /* Distinct Styles for Downloads */
+        .dl-input { background: #e2e8f0; color: var(--text-dark); border: 1px solid #cbd5e1; }
+        .dl-input:hover { background: #cbd5e1; }
 
-        .dashboard-link {
-            background: linear-gradient(90deg, #7c3aed, #9333ea);
-            border: none;
-        }
+        .dl-ocr { background: #fff; color: var(--iocl-blue); border: 1px solid var(--iocl-blue); }
+        .dl-ocr:hover { background: #f0f9ff; }
 
-        .dashboard-link:hover {
-            opacity: 0.9;
-        }
+        .dl-dash { background: var(--iocl-blue); color: white; border: 1px solid var(--iocl-blue); }
+        .dl-dash:hover { background: #002244; box-shadow: 0 4px 12px rgba(0,51,102,0.2); }
 
-        /* MOBILE */
-        @media (max-width: 900px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
-        }
+        /* Mobile */
+        @media (max-width: 900px) { .main-container { grid-template-columns: 1fr; } }
     </style>
 </head>
-
 <body>
 
-<div class="page">
-    <div class="container">
-
-        <!-- LEFT PANEL -->
-        <div class="left">
-            <h1>📊 FinVision AI</h1>
-            <p class="subtitle">
-                Agentic AI for Document Digitization & Financial Validation
-            </p>
-
-            <div class="section">
-                <form id="uploadForm" enctype="multipart/form-data">
-                    <input type="file" name="file" accept="image/*" required>
-                    <button type="submit">Upload & Process</button>
-                </form>
-            </div>
-
-            <div class="section">
-                <button class="secondary-btn" onclick="startCamera()">📷 Open Camera</button>
-                <button class="secondary-btn" onclick="capturePhoto()" id="captureBtn" style="display:none;">
-                    Capture & Process
-                </button>
-            </div>
-
-            <div id="status"></div>
+<header>
+    <div class="logo-area">
+        <div class="logo-text">
+            <h1>FinVision AI</h1>
+            <p>Indian Oil Corporation Ltd. (Validation System)</p>
         </div>
-
-        <!-- RIGHT PANEL -->
-        <div class="right">
-            <div class="preview-box">
-                <video id="camera" autoplay playsinline style="display:none;"></video>
-                <canvas id="snapshot" style="display:none;"></canvas>
-                <img id="preview" style="display:none;" />
-            </div>
-
-            <div class="downloads">
-                <a href="/download/ocr" target="_blank">⬇ Download OCR Excel</a>
-                <a href="/download/payments" target="_blank">⬇ Download Payments Excel</a>
-                <a href="/download/dashboard" target="_blank" class="dashboard-link">
-                    📊 Download Executive Dashboard
-                </a>
-            </div>
-        </div>
-
     </div>
+    <div class="badge">INTERNAL USE ONLY</div>
+</header>
+
+<div class="main-container">
+    
+    <div class="card">
+        <h2>Document Input</h2>
+        
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="input-group">
+                <label style="display:block; margin-bottom:8px; font-weight:600; font-size:14px;">Upload Scanned Image</label>
+                <input type="file" name="file" accept="image/*" required>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <span>⚡ Upload & Analyze</span>
+            </button>
+        </form>
+
+        <div style="margin-top: 30px; border-top: 2px dashed #e2e8f0; padding-top: 20px;">
+            <label style="display:block; margin-bottom:8px; font-weight:600; font-size:14px;">Or Use Live Camera</label>
+            <button class="btn btn-secondary" onclick="startCamera()">📷 Open Camera</button>
+            <button class="btn btn-primary" onclick="capturePhoto()" id="captureBtn" style="display:none; margin-top:10px;">
+                📸 Capture & Process
+            </button>
+        </div>
+
+        <div id="status-box">System Ready. Waiting for input...</div>
+    </div>
+
+    <div class="card">
+        <h2>Analysis Results</h2>
+        
+        <div class="preview-area">
+            <video id="camera" autoplay playsinline style="display:none;"></video>
+            <canvas id="snapshot" style="display:none;"></canvas>
+            <img id="preview" style="display:none;" alt="Captured Image" />
+            <span id="placeholder" class="placeholder-text">Document preview will appear here</span>
+        </div>
+
+        <div class="download-grid" id="downloadSection">
+            <p style="font-size:13px; font-weight:600; color:#003366; margin-bottom:5px;">✅ Process Complete. Download Reports:</p>
+            
+            <a href="/download/input" target="_blank" class="dl-btn dl-input">
+                <span>📥 Original Input Image</span>
+                <span>PNG/JPG</span>
+            </a>
+
+            <a href="/download/ocr" target="_blank" class="dl-btn dl-ocr">
+                <span>📄 Raw OCR Data</span>
+                <span>XLSX</span>
+            </a>
+
+            <a href="/download/dashboard" target="_blank" class="dl-btn dl-dash">
+                <span>📊 Executive Audit Dashboard</span>
+                <span>XLSX</span>
+            </a>
+        </div>
+    </div>
+
 </div>
 
 <script>
     const form = document.getElementById("uploadForm");
-    const statusDiv = document.getElementById("status");
+    const statusBox = document.getElementById("status-box");
     const video = document.getElementById("camera");
     const canvas = document.getElementById("snapshot");
     const preview = document.getElementById("preview");
+    const placeholder = document.getElementById("placeholder");
     const captureBtn = document.getElementById("captureBtn");
+    const downloadSection = document.getElementById("downloadSection");
 
+    function updateStatus(msg, type) {
+        statusBox.innerText = msg;
+        if(type === 'success') {
+            statusBox.style.borderLeftColor = '#22c55e';
+            statusBox.style.color = '#0f172a';
+        } else if (type === 'error') {
+            statusBox.style.borderLeftColor = '#ef4444';
+            statusBox.style.color = '#b91c1c';
+        } else {
+            statusBox.style.borderLeftColor = '#F47920'; // Processing
+            statusBox.style.color = '#1e293b';
+        }
+    }
+
+    function showDownloads() {
+        downloadSection.style.display = 'grid';
+    }
+
+    // 1. Upload Logic
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        statusDiv.innerText = "⏳ Processing document...";
-
-        const formData = new FormData(form);
-
+        updateStatus("⏳ AI Agents are analyzing the document...", "process");
+        
         try {
+            const formData = new FormData(form);
             const res = await fetch("/upload", { method: "POST", body: formData });
-            statusDiv.innerText = res.ok
-                ? "✅ Processing complete. Download outputs on the right."
-                : "❌ Processing failed.";
-        } catch {
-            statusDiv.innerText = "❌ Server error.";
+            
+            if (res.ok) {
+                updateStatus("✅ Analysis Complete. Reports generated below.", "success");
+                showDownloads();
+            } else {
+                updateStatus("❌ Server Error. Please check terminal logs.", "error");
+            }
+        } catch (err) {
+            updateStatus("❌ Connection Failed.", "error");
         }
     });
 
+    // 2. Camera Logic
     async function startCamera() {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" }
-        });
-        video.srcObject = stream;
-        video.style.display = "block";
-        captureBtn.style.display = "block";
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = stream;
+            video.style.display = "block";
+            preview.style.display = "none";
+            placeholder.style.display = "none";
+            captureBtn.style.display = "flex";
+            updateStatus("📷 Camera Active. Align the document within the frame.", "process");
+        } catch (err) {
+            updateStatus("❌ Camera Access Denied. Check permissions.", "error");
+        }
     }
 
+    // 3. Capture Logic
     async function capturePhoto() {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext("2d").drawImage(video, 0, 0);
 
         canvas.toBlob(async (blob) => {
+            // UI Update
             preview.src = URL.createObjectURL(blob);
             preview.style.display = "block";
+            video.style.display = "none";
+            captureBtn.style.display = "none";
+            video.srcObject.getTracks().forEach(track => track.stop());
 
-            statusDiv.innerText = "⏳ Processing captured image...";
+            updateStatus("⏳ Processing captured image...", "process");
 
             const formData = new FormData();
             formData.append("file", blob, "camera_capture.png");
 
             try {
-                const res = await fetch("/upload", {
-                    method: "POST",
-                    body: formData
-                });
-                statusDiv.innerText = res.ok
-                    ? "✅ Processing complete. Download outputs on the right."
-                    : "❌ Processing failed.";
+                const res = await fetch("/upload", { method: "POST", body: formData });
+                if (res.ok) {
+                    updateStatus("✅ Analysis Complete. Reports generated below.", "success");
+                    showDownloads();
+                } else {
+                    updateStatus("❌ Processing Failed.", "error");
+                }
             } catch {
-                statusDiv.innerText = "❌ Server error.";
+                updateStatus("❌ Connection Error.", "error");
             }
         }, "image/png");
     }

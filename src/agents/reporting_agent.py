@@ -1,103 +1,114 @@
 import pandas as pd
-from pathlib import Path
+import os
 from openpyxl import load_workbook
-from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl.chart import PieChart, BarChart, Reference
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-OUTPUT_DIR = BASE_DIR / "data" / "output"
-REPORT_DIR = BASE_DIR / "reports"
+class ReportingAgent:
+    def __init__(self, output_dir="data/output"):
+        self.output_dir = output_dir
+        os.makedirs(self.output_dir, exist_ok=True)
 
-OCR_FILE = OUTPUT_DIR / "ocr.xlsx"
-PAYMENT_FILE = OUTPUT_DIR / "payments.xlsx"
-DASHBOARD_FILE = REPORT_DIR / "finvision_dashboard.xlsx"
+    def generate_dashboard(self, df, stats):
+        """
+        Generates two files:
+        1. ocr_data.xlsx (Raw OCR Output)
+        2. FinVision_Dashboard.xlsx (Executive Dashboard with Colors)
+        """
+        dashboard_path = os.path.join(self.output_dir, "FinVision_Dashboard.xlsx")
+        ocr_path = os.path.join(self.output_dir, "ocr_data.xlsx")
+        
+        # --- 1. SAVE RAW OCR DATA (SEPARATE FILE) ---
+        if not df.empty:
+            df.to_excel(ocr_path, index=False)
+            print(f" [Reporting Agent] Raw OCR Data saved: {ocr_path}")
+        
+        # --- 2. CREATE DASHBOARD WORKBOOK ---
+        with pd.ExcelWriter(dashboard_path, engine='openpyxl') as writer:
+            # Create Sheets
+            pd.DataFrame().to_excel(writer, sheet_name="Executive Summary")
+            
+            if not df.empty:
+                df.to_excel(writer, sheet_name="Audit Logs", index=False)
+            else:
+                pd.DataFrame(["No Data Found"]).to_excel(writer, sheet_name="Audit Logs", header=False)
 
-REPORT_DIR.mkdir(exist_ok=True)
+        # --- 3. APPLY STYLING TO DASHBOARD ---
+        wb = load_workbook(dashboard_path)
+        
+        # Build Summary Sheet
+        self._build_executive_summary(wb["Executive Summary"], stats)
+        
+        # Format Data Sheet (Red/Green logic)
+        if not df.empty and "Audit Logs" in wb.sheetnames:
+            self._format_audit_logs(wb["Audit Logs"], df)
 
-def generate_dashboard():
-    pay_df = pd.read_excel(PAYMENT_FILE)
-    ocr_df = pd.read_excel(OCR_FILE)
+        wb.save(dashboard_path)
+        print(f" [Reporting Agent] Dashboard generated: {dashboard_path}")
+        return dashboard_path
 
-    with pd.ExcelWriter(DASHBOARD_FILE, engine="openpyxl") as writer:
-        pay_df.to_excel(writer, sheet_name="PAYMENT_DECISIONS", index=False)
-        ocr_df.to_excel(writer, sheet_name="RAW_OCR_DATA", index=False)
+    def _build_executive_summary(self, ws, stats):
+        # Title
+        ws["A1"] = "FINVISION AI – EXECUTIVE DASHBOARD"
+        ws["A1"].font = Font(size=18, bold=True, color="1F4E78")
+        ws.merge_cells("A1:E1")
 
-    wb = load_workbook(DASHBOARD_FILE)
-    build_executive_summary(wb, pay_df, ocr_df)
-    format_payment_sheet(wb)
-    build_risk_analysis(wb, pay_df)
-    build_ocr_quality(wb, ocr_df)
+        # Metrics
+        total = stats.get("total_rows", 0)
+        risk = stats.get("unsigned_count", 0)
+        safe = stats.get("verified_count", 0)
+        ink = stats.get("ink_density", 0)
+        
+        metrics = [
+            ("Total Logs Scanned", total, "E0E0E0"),
+            ("Verified / Safe", safe, "C6EFCE"),
+            ("Risk / Unsigned", risk, "FFC7CE"),
+            ("Ink Density Detected", f"{ink}", "FFEB9C")
+        ]
 
-    wb.save(DASHBOARD_FILE)
+        row_start = 3
+        for i, (title, val, color) in enumerate(metrics):
+            # Label
+            ws.cell(row=row_start + i, column=1, value=title).font = Font(bold=True, size=12)
+            # Value
+            cell_val = ws.cell(row=row_start + i, column=2, value=val)
+            cell_val.font = Font(bold=True, size=12)
+            cell_val.alignment = Alignment(horizontal="center")
+            cell_val.fill = PatternFill("solid", fgColor=color)
+            cell_val.border = Border(top=Side(style='thin'), left=Side(style='thin'), right=Side(style='thin'), bottom=Side(style='thin'))
 
-def build_executive_summary(wb, pay_df, ocr_df):
-    ws = wb.create_sheet("EXECUTIVE_SUMMARY", 0)
+        ws.column_dimensions["A"].width = 25
+        ws.column_dimensions["B"].width = 15
 
-    ws["A1"] = "FINVISION AI – EXECUTIVE DASHBOARD"
-    ws["A1"].font = Font(size=16, bold=True)
-    ws.merge_cells("A1:F1")
+    def _format_audit_logs(self, ws, df):
+        # Styles
+        red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        red_font = Font(color="9C0006")
+        green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        green_font = Font(color="006100")
+        header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF")
 
-    total = len(pay_df)
-    ready = len(pay_df[pay_df["final_status"] == "READY_FOR_PAYMENT"])
-    hold = len(pay_df[pay_df["final_status"] == "ON_HOLD"])
-    avg_conf = round(ocr_df["confidence"].mean(), 2)
-    high_risk = len(pay_df[pay_df["fraud_risk_score"] > 0.5])
+        # Header
+        for cell in ws[1]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center")
 
-    metrics = [
-        ("Total Documents Processed", total, "D9F99D"),
-        ("Ready for Payment", ready, "22C55E"),
-        ("On Hold (Audit Review)", hold, "FACC15"),
-        ("Avg OCR Confidence", avg_conf, "38BDF8"),
-        ("High Risk Documents", high_risk, "EF4444"),
-    ]
+        # Logic
+        try:
+            status_col_idx = df.columns.get_loc("Audit Status") + 1
+            for row in ws.iter_rows(min_row=2):
+                status_val = row[status_col_idx - 1].value
+                if status_val == "Risk (Unsigned/Empty)":
+                    for cell in row:
+                        cell.fill = red_fill
+                        cell.font = red_font
+                else:
+                    for cell in row:
+                        cell.fill = green_fill
+                        cell.font = green_font
+        except KeyError:
+            pass
 
-    row = 3
-    for title, value, color in metrics:
-        ws[f"A{row}"] = title
-        ws[f"A{row}"].font = Font(bold=True)
-        ws[f"B{row}"] = value
-        ws[f"B{row}"].font = Font(size=14, bold=True)
-        ws[f"B{row}"].fill = PatternFill("solid", fgColor=color)
-        ws[f"B{row}"].alignment = Alignment(horizontal="center")
-        row += 1
-
-def format_payment_sheet(wb):
-    ws = wb["PAYMENT_DECISIONS"]
-    ws.freeze_panes = "A2"
-
-    for col in ws.columns:
-        ws.column_dimensions[col[0].column_letter].width = 18
-
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
-
-def build_risk_analysis(wb, pay_df):
-    ws = wb.create_sheet("RISK_ANALYSIS")
-
-    ws["A1"] = "Risk Distribution"
-    ws["A1"].font = Font(bold=True)
-
-    ws.append(["Risk Category", "Count"])
-    ws.append(["Low (<0.3)", len(pay_df[pay_df["fraud_risk_score"] < 0.3])])
-    ws.append(["Medium (0.3–0.6)", len(pay_df[(pay_df["fraud_risk_score"] >= 0.3) & (pay_df["fraud_risk_score"] <= 0.6)])])
-    ws.append(["High (>0.6)", len(pay_df[pay_df["fraud_risk_score"] > 0.6])])
-
-    chart = BarChart()
-    data = Reference(ws, min_col=2, min_row=2, max_row=4)
-    labels = Reference(ws, min_col=1, min_row=3, max_row=5)
-    chart.add_data(data, titles_from_data=True)
-    chart.set_categories(labels)
-    chart.title = "Fraud Risk Distribution"
-
-    ws.add_chart(chart, "D2")
-
-def build_ocr_quality(wb, ocr_df):
-    ws = wb.create_sheet("OCR_QUALITY")
-
-    ws["A1"] = "OCR Quality Overview"
-    ws["A1"].font = Font(bold=True)
-
-    ws.append(["Metric", "Value"])
-    ws.append(["Average OCR Confidence", round(ocr_df["confidence"].mean(), 2)])
-    ws.append(["Min OCR Confidence", round(ocr_df["confidence"].min(), 2)])
-    ws.append(["Max OCR Confidence", round(ocr_df["confidence"].max(), 2)])
+        for col in ws.columns:
+            ws.column_dimensions[col[0].column_letter].width = 18

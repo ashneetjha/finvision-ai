@@ -1,131 +1,142 @@
+import sys
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+from pathlib import Path
+import shutil
+import uvicorn
+import traceback
+
+# ---------------- PATH FIX ----------------
+# Forces Python to recognize the 'src' folder
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[1]  # FinVision-AI root
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
 
 from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
-import shutil
-import pandas as pd
-from datetime import datetime
 
-from src.agents.ocr_agent import run_ocr
-from src.agents.audit_agent import evaluate_payment
-from src.agents.reporting_agent import generate_dashboard
+# ---------------- SAFE IMPORTS ----------------
+OCRAgent = None
+AuditAgent = None
+ReportingAgent = None
+
+try:
+    from src.agents.ocr_agent import OCRAgent
+    from src.agents.audit_agent import AuditAgent
+    from src.agents.reporting_agent import ReportingAgent
+except ImportError as e:
+    print("\n" + "="*50)
+    print(f"❌ CRITICAL IMPORT ERROR: {e}")
+    print("This is usually caused by a missing library (like cv2/OpenCV).")
+    print("TRY RUNNING: pip install opencv-python-headless")
+    print("="*50 + "\n")
 
 app = FastAPI(title="FinVision AI")
 
-# ---------------- PATH SETUP (RENDER SAFE) ----------------
-BASE_DIR = Path(__file__).resolve().parents[1]
-RAW_DIR = BASE_DIR / "data" / "raw"
-OUT_DIR = BASE_DIR / "data" / "output"
-REPORT_DIR = BASE_DIR / "reports"
-
-OCR_FILE = OUT_DIR / "ocr.xlsx"
-PAYMENT_FILE = OUT_DIR / "payments.xlsx"
-DASHBOARD_FILE = REPORT_DIR / "finvision_dashboard.xlsx"
+# ---------------- SETUP DIRECTORIES ----------------
+RAW_DIR = ROOT / "data" / "raw"
+OUT_DIR = ROOT / "data" / "output"
+TEMPLATES_DIR = ROOT / "templates"
 
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
-REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-# ---------------- DASHBOARD UI ----------------
+# Global variable to track the last uploaded file for download
+LAST_UPLOADED_FILE = None
+
+# ---------------- AGENT INITIALIZATION ----------------
+ocr_agent = None
+audit_agent = None
+reporting_agent = None
+
+print(" [System] Initializing AI Agents...")
+
+if OCRAgent is None:
+    print(" [System] ⚠️  Skipping Agent Init because imports failed (Check logs above).")
+else:
+    try:
+        ocr_agent = OCRAgent()
+        audit_agent = AuditAgent()
+        reporting_agent = ReportingAgent(output_dir=OUT_DIR)
+        print(" [System] ✅ Agents Ready.")
+    except Exception as e:
+        print(f" [System] ❌ Error Initializing Agents: {e}")
+
+# ---------------- ROUTES ----------------
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-# ---------------- UPLOAD & PROCESS ----------------
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
-    img_path = RAW_DIR / file.filename
+    global LAST_UPLOADED_FILE
 
-    with open(img_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Check if agents loaded successfully
+    if not ocr_agent:
+        return JSONResponse({
+            "status": "Error", 
+            "message": "AI System failed to load. Check the terminal for 'ImportError'."
+        }, status_code=500)
 
-    processed_time = datetime.utcnow()
+    try:
+        # 1. Save File
+        file_path = RAW_DIR / file.filename
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Track file for the "Download Input" button
+        LAST_UPLOADED_FILE = file.filename
 
-    # -------- OCR AGENT (ML PERCEPTION) --------
-    ocr_rows = run_ocr(img_path)
+        # 2. Run Pipeline
+        df_ocr = ocr_agent.extract_structured_data(file_path)
+        df_audited, stats = audit_agent.audit_dataframe(df_ocr, image_path=file_path)
+        
+        # Generates both dashboard and raw OCR excel
+        reporting_agent.generate_dashboard(df_audited, stats)
 
-    ocr_df = pd.DataFrame([
-        {
-            "file_name": file.filename,
-            "page_no": row["page_no"],
-            "line_no": row["line_no"],
-            "extracted_text": row["extracted_text"],
-            "confidence": row["confidence"],
-            "processed_utc": processed_time
-        }
-        for row in ocr_rows
-    ])
+        return JSONResponse({
+            "status": "Success",
+            "message": f"Processed successfully. Found {stats.get('unsigned_count', 0)} risks.",
+            "download_url": "/download/dashboard"
+        })
 
-    # -------- DATA QUALITY AGENT --------
-    avg_confidence = round(ocr_df["confidence"].mean(), 3) if not ocr_df.empty else 0.0
-    data_quality_flag = "OK" if avg_confidence >= 0.6 else "LOW_CONFIDENCE"
-
-    decision_stage = (
-        "REQUIRES_MANUAL_REVIEW"
-        if avg_confidence < 0.6
-        else "AUTO_AUDIT_PASSED"
-    )
-
-    # -------- AUDIT AGENT --------
-    payment_record = evaluate_payment(
-        file_name=file.filename,
-        ocr_df=ocr_df,
-        avg_confidence=avg_confidence,
-        processed_time=processed_time
-    )
-
-    payment_record["decision_stage"] = decision_stage
-    payment_record["data_quality_flag"] = data_quality_flag
-
-    payment_df = pd.DataFrame([payment_record])
-
-    # -------- REPORTING DATA PERSISTENCE --------
-    if OCR_FILE.exists():
-        ocr_df = pd.concat([pd.read_excel(OCR_FILE), ocr_df], ignore_index=True)
-    ocr_df.to_excel(OCR_FILE, index=False)
-
-    if PAYMENT_FILE.exists():
-        payment_df = pd.concat([pd.read_excel(PAYMENT_FILE), payment_df], ignore_index=True)
-    payment_df.to_excel(PAYMENT_FILE, index=False)
-
-    # -------- EXECUTIVE DASHBOARD GENERATION --------
-    generate_dashboard()
-
-    return JSONResponse({
-        "status": "processed",
-        "lines_detected": len(ocr_df),
-        "avg_confidence": avg_confidence,
-        "data_quality_flag": data_quality_flag,
-        "decision_stage": decision_stage,
-        "dashboard_generated": True
-    })
+    except Exception as e:
+        print(f"Processing Error: {e}")
+        print(traceback.format_exc())
+        return JSONResponse({"status": "Error", "message": str(e)}, status_code=500)
 
 # ---------------- DOWNLOAD ENDPOINTS ----------------
-@app.get("/download/ocr")
-def download_ocr():
-    if not OCR_FILE.exists():
-        return JSONResponse({"error": "OCR file not available"}, status_code=404)
-    return FileResponse(OCR_FILE, filename="ocr.xlsx")
-
-@app.get("/download/payments")
-def download_payments():
-    if not PAYMENT_FILE.exists():
-        return JSONResponse({"error": "Payments file not available"}, status_code=404)
-    return FileResponse(PAYMENT_FILE, filename="payments.xlsx")
 
 @app.get("/download/dashboard")
 def download_dashboard():
-    if not DASHBOARD_FILE.exists():
-        return JSONResponse(
-            {"error": "Dashboard not available yet"},
-            status_code=404
-        )
-    return FileResponse(
-        DASHBOARD_FILE,
-        filename="finvision_dashboard.xlsx"
-    )
+    """Serves the colored Executive Dashboard"""
+    path = OUT_DIR / "FinVision_Dashboard.xlsx"
+    if path.exists():
+        return FileResponse(path, filename="FinVision_Dashboard.xlsx")
+    return JSONResponse({"error": "Dashboard not generated yet"}, status_code=404)
+
+@app.get("/download/ocr")
+def download_ocr():
+    """Serves the Raw OCR Data"""
+    path = OUT_DIR / "ocr_data.xlsx"
+    if path.exists():
+        return FileResponse(path, filename="ocr_data.xlsx")
+    return JSONResponse({"error": "OCR Data not found"}, status_code=404)
+
+@app.get("/download/input")
+def download_input():
+    """Serves the Original Uploaded Image"""
+    global LAST_UPLOADED_FILE
+    if LAST_UPLOADED_FILE:
+        path = RAW_DIR / LAST_UPLOADED_FILE
+        if path.exists():
+            return FileResponse(path, filename=LAST_UPLOADED_FILE)
+    return JSONResponse({"error": "No input file uploaded yet"}, status_code=404)
+
+if __name__ == "__main__":
+    print("🚀 Starting Server at http://127.0.0.1:8000")
+    # Run on localhost to avoid firewall issues
+    uvicorn.run(app, host="127.0.0.1", port=8000)
