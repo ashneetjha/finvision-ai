@@ -4,6 +4,9 @@ from pathlib import Path
 import shutil
 import uvicorn
 import traceback
+import cv2
+import numpy as np
+from pdf2image import convert_from_path
 
 # ---------------- PATH FIX ----------------
 # Forces Python to recognize the 'src' folder
@@ -14,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 # ---------------- SAFE IMPORTS ----------------
@@ -28,8 +32,8 @@ try:
 except ImportError as e:
     print("\n" + "="*50)
     print(f"❌ CRITICAL IMPORT ERROR: {e}")
-    print("This is usually caused by a missing library (like cv2/OpenCV).")
-    print("TRY RUNNING: pip install opencv-python-headless")
+    print("This is usually caused by a missing library (like cv2/OpenCV or pdf2image).")
+    print("TRY RUNNING: pip install -r requirements.txt")
     print("="*50 + "\n")
 
 app = FastAPI(title="FinVision AI")
@@ -42,6 +46,8 @@ TEMPLATES_DIR = ROOT / "templates"
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# Mount Static Files (Critical for serving the Preview Image)
+app.mount("/static", StaticFiles(directory=str(RAW_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 # Global variable to track the last uploaded file for download
@@ -83,16 +89,42 @@ async def upload_image(file: UploadFile = File(...)):
 
     try:
         # 1. Save File
-        file_path = RAW_DIR / file.filename
+        safe_filename = file.filename
+        file_path = RAW_DIR / safe_filename
+        
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # Track file for the "Download Input" button
-        LAST_UPLOADED_FILE = file.filename
+        LAST_UPLOADED_FILE = safe_filename
+        print(f" [Orchestrator] File saved at: {file_path}")
 
-        # 2. Run Pipeline
+        # 2. Handle PDF vs Image (Preview & Audit Preparation)
+        # We need a standard image path for the Audit Agent (signature check) 
+        # and for the Frontend Preview.
+        preview_filename = f"preview_{safe_filename}.png"
+        preview_path = RAW_DIR / preview_filename
+        audit_image_path = file_path # Default to original if it's an image
+
+        file_ext = file_path.suffix.lower()
+
+        if file_ext == '.pdf':
+            print(" [Orchestrator] PDF detected. Converting Page 1 for Audit & Preview...")
+            # Convert first page to image
+            pages = convert_from_path(str(file_path), first_page=1, last_page=1)
+            if pages:
+                pages[0].save(preview_path, "PNG")
+                audit_image_path = preview_path # Audit agent will analyze this image
+        else:
+            # It's already an image, just copy it for preview consistency
+            shutil.copy(file_path, preview_path)
+            audit_image_path = file_path
+
+        # 3. Run Pipeline
+        # OCR Agent handles PDFs natively now, so we pass the ORIGINAL path
         df_ocr = ocr_agent.extract_structured_data(file_path)
-        df_audited, stats = audit_agent.audit_dataframe(df_ocr, image_path=file_path)
+        
+        # Audit Agent needs an IMAGE path to detect signatures (ink density)
+        df_audited, stats = audit_agent.audit_dataframe(df_ocr, image_path=audit_image_path)
         
         # Generates both dashboard and raw OCR excel
         reporting_agent.generate_dashboard(df_audited, stats)
@@ -100,7 +132,8 @@ async def upload_image(file: UploadFile = File(...)):
         return JSONResponse({
             "status": "Success",
             "message": f"Processed successfully. Found {stats.get('unsigned_count', 0)} risks.",
-            "download_url": "/download/dashboard"
+            "download_url": "/download/dashboard",
+            "preview_url": f"/static/{preview_filename}" # Frontend can now load this
         })
 
     except Exception as e:
@@ -137,6 +170,6 @@ def download_input():
     return JSONResponse({"error": "No input file uploaded yet"}, status_code=404)
 
 if __name__ == "__main__":
-    print("🚀 Starting Server at http://127.0.0.1:8000")
+    print(" Starting Server at http://127.0.0.1:8000")
     # Run on localhost to avoid firewall issues
     uvicorn.run(app, host="127.0.0.1", port=8000)

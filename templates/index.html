@@ -13,6 +13,7 @@
             --white: #ffffff;
             --text-dark: #1e293b;
             --text-gray: #64748b;
+            --success-green: #22c55e;
         }
 
         * { box-sizing: border-box; }
@@ -68,20 +69,36 @@
 
         h2 { margin-top: 0; color: var(--iocl-blue); font-size: 18px; border-bottom: 2px solid #f1f5f9; padding-bottom: 15px; margin-bottom: 20px; }
 
-        /* --- Forms & Buttons --- */
-        .input-group { margin-bottom: 20px; }
-        
-        input[type="file"] {
-            width: 100%;
-            padding: 12px;
+        /* --- Drag & Drop Zone --- */
+        .drop-zone {
             border: 2px dashed #cbd5e1;
-            border-radius: 8px;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
             background: #f8fafc;
             cursor: pointer;
-            transition: 0.2s;
+            transition: all 0.3s;
+            margin-bottom: 20px;
         }
-        input[type="file"]:hover { border-color: var(--iocl-blue); background: #f1f5f9; }
 
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--iocl-blue);
+            background: #eff6ff;
+        }
+
+        .drop-zone p { margin: 5px 0; color: var(--text-dark); font-weight: 600; }
+        .drop-zone .sub-text { font-size: 12px; color: var(--text-gray); font-weight: 400; }
+        .drop-icon { font-size: 32px; margin-bottom: 10px; display: block; }
+        
+        .selected-file-name {
+            font-size: 13px;
+            color: var(--success-green);
+            font-weight: 600;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* --- Buttons --- */
         .btn {
             width: 100%;
             padding: 14px;
@@ -102,6 +119,9 @@
 
         .btn-secondary { background-color: var(--iocl-orange); color: white; margin-top: 15px; }
         .btn-secondary:hover { background-color: #d66010; transform: translateY(-1px); }
+        
+        .btn-danger { background-color: #ef4444; color: white; margin-top: 10px; }
+        .btn-danger:hover { background-color: #dc2626; }
 
         /* --- Status --- */
         #status-box {
@@ -150,7 +170,6 @@
             transition: 0.2s;
         }
 
-        /* Distinct Styles for Downloads */
         .dl-input { background: #e2e8f0; color: var(--text-dark); border: 1px solid #cbd5e1; }
         .dl-input:hover { background: #cbd5e1; }
 
@@ -182,10 +201,15 @@
         <h2>Document Input</h2>
         
         <form id="uploadForm" enctype="multipart/form-data">
-            <div class="input-group">
-                <label style="display:block; margin-bottom:8px; font-weight:600; font-size:14px;">Upload Scanned Image</label>
-                <input type="file" name="file" accept="image/*" required>
+            
+            <div id="drop-zone" class="drop-zone">
+                <span class="drop-icon">📂</span>
+                <p>Drag & Drop Document Here</p>
+                <p class="sub-text">Supports JPG, PNG, and PDF</p>
+                <input type="file" id="file-input" name="file" accept=".jpg,.jpeg,.png,.pdf" hidden required>
+                <div id="file-name-display" class="selected-file-name"></div>
             </div>
+
             <button type="submit" class="btn btn-primary">
                 <span>⚡ Upload & Analyze</span>
             </button>
@@ -193,10 +217,12 @@
 
         <div style="margin-top: 30px; border-top: 2px dashed #e2e8f0; padding-top: 20px;">
             <label style="display:block; margin-bottom:8px; font-weight:600; font-size:14px;">Or Use Live Camera</label>
-            <button class="btn btn-secondary" onclick="startCamera()">📷 Open Camera</button>
-            <button class="btn btn-primary" onclick="capturePhoto()" id="captureBtn" style="display:none; margin-top:10px;">
-                📸 Capture & Process
-            </button>
+            
+            <div id="camera-controls">
+                <button id="start-cam-btn" class="btn btn-secondary" onclick="startCamera()">📷 Open Camera</button>
+                <button id="stop-cam-btn" class="btn btn-danger" onclick="stopCamera()" style="display:none;">❌ Close Camera</button>
+                <button id="capture-btn" class="btn btn-primary" onclick="capturePhoto()" style="display:none; margin-top:10px;">📸 Capture & Process</button>
+            </div>
         </div>
 
         <div id="status-box">System Ready. Waiting for input...</div>
@@ -216,8 +242,8 @@
             <p style="font-size:13px; font-weight:600; color:#003366; margin-bottom:5px;">✅ Process Complete. Download Reports:</p>
             
             <a href="/download/input" target="_blank" class="dl-btn dl-input">
-                <span>📥 Original Input Image</span>
-                <span>PNG/JPG</span>
+                <span>📥 Original Input</span>
+                <span>FILE</span>
             </a>
 
             <a href="/download/ocr" target="_blank" class="dl-btn dl-ocr">
@@ -237,12 +263,23 @@
 <script>
     const form = document.getElementById("uploadForm");
     const statusBox = document.getElementById("status-box");
+    
+    // Drag & Drop Elements
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const fileNameDisplay = document.getElementById('file-name-display');
+
+    // Camera Elements
     const video = document.getElementById("camera");
     const canvas = document.getElementById("snapshot");
     const preview = document.getElementById("preview");
     const placeholder = document.getElementById("placeholder");
-    const captureBtn = document.getElementById("captureBtn");
+    const startCamBtn = document.getElementById("start-cam-btn");
+    const stopCamBtn = document.getElementById("stop-cam-btn");
+    const captureBtn = document.getElementById("capture-btn");
+    
     const downloadSection = document.getElementById("downloadSection");
+    let streamReference = null; // To store stream for stopping later
 
     function updateStatus(msg, type) {
         statusBox.innerText = msg;
@@ -262,7 +299,39 @@
         downloadSection.style.display = 'grid';
     }
 
-    // 1. Upload Logic
+    // --- DRAG & DROP LOGIC ---
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            updateFileName(e.dataTransfer.files[0].name);
+        }
+    });
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) {
+            updateFileName(fileInput.files[0].name);
+        }
+    });
+
+    function updateFileName(name) {
+        fileNameDisplay.textContent = "Selected: " + name;
+        fileNameDisplay.style.display = "block";
+    }
+
+    // --- UPLOAD LOGIC ---
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
         updateStatus("⏳ AI Agents are analyzing the document...", "process");
@@ -282,34 +351,59 @@
         }
     });
 
-    // 2. Camera Logic
+    // --- CAMERA LOGIC ---
     async function startCamera() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            video.srcObject = stream;
+            streamReference = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = streamReference;
             video.style.display = "block";
             preview.style.display = "none";
             placeholder.style.display = "none";
-            captureBtn.style.display = "flex";
+            
+            // Toggle Buttons
+            startCamBtn.style.display = "none";
+            stopCamBtn.style.display = "block";
+            captureBtn.style.display = "block";
+            
             updateStatus("📷 Camera Active. Align the document within the frame.", "process");
         } catch (err) {
             updateStatus("❌ Camera Access Denied. Check permissions.", "error");
         }
     }
 
-    // 3. Capture Logic
+    function stopCamera() {
+        if (streamReference) {
+            streamReference.getTracks().forEach(track => track.stop());
+            streamReference = null;
+        }
+        video.style.display = "none";
+        preview.style.display = "none";
+        placeholder.style.display = "block";
+        
+        // Toggle Buttons
+        startCamBtn.style.display = "block";
+        stopCamBtn.style.display = "none";
+        captureBtn.style.display = "none";
+
+        updateStatus("Camera stopped.", "process");
+    }
+
     async function capturePhoto() {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext("2d").drawImage(video, 0, 0);
 
         canvas.toBlob(async (blob) => {
-            // UI Update
+            // UI Update: Show the captured image immediately
             preview.src = URL.createObjectURL(blob);
             preview.style.display = "block";
-            video.style.display = "none";
-            captureBtn.style.display = "none";
-            video.srcObject.getTracks().forEach(track => track.stop());
+            
+            // Stop camera automatically after capture
+            stopCamera(); 
+            
+            // Override the placeholder text logic from stopCamera since we have an image
+            placeholder.style.display = "none";
+            preview.style.display = "block";
 
             updateStatus("⏳ Processing captured image...", "process");
 

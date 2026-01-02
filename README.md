@@ -1,4 +1,6 @@
-### **README.md**
+Here is the refined and polished **`README.md`** file, formatted correctly for direct copy-pasting into your repository.
+
+I have aligned the formatting, fixed the indentation for lists, and ensured the headers and code blocks are clean.
 
 ```markdown
 # 🦅 FinVision AI
@@ -48,7 +50,7 @@ Deployed as a cloud-native microservice, it leverages Deep Learning (CNN+RNN) fo
 
 Run FinVision AI on your local machine in minutes.
 
-### Prerequisites
+#### Prerequisites
 * **Python 3.10+**
 * **Git**
 * **Poppler** (System-level dependency for PDF processing)
@@ -56,21 +58,21 @@ Run FinVision AI on your local machine in minutes.
     * *Linux (Debian/Ubuntu):* `sudo apt-get install poppler-utils`
     * *Mac:* `brew install poppler`
 
-### 1. Clone the Repository
+#### 1. Clone the Repository
 ```bash
 git clone [https://github.com/ashneetjha/FinVision-AI.git](https://github.com/ashneetjha/FinVision-AI.git)
 cd FinVision-AI
 
 ```
 
-### 2. Create Virtual Environment (Recommended)
+#### 2. Create Virtual Environment (Recommended)
 
 ```bash
-# Using Conda
+# Option A: Using Conda
 conda create -n finvision python=3.10
 conda activate finvision
 
-# OR using standard venv
+# Option B: Using standard venv
 python -m venv venv
 # Windows:
 .\venv\Scripts\activate
@@ -79,7 +81,7 @@ source venv/bin/activate
 
 ```
 
-### 3. Install Python Dependencies
+#### 3. Install Python Dependencies
 
 ```bash
 # Installs FastAPI, EasyOCR, PDF2Image, OpenCV, etc.
@@ -87,7 +89,7 @@ pip install -r requirements.txt
 
 ```
 
-### 4. Run the Application
+#### 4. Run the Application
 
 ```bash
 uvicorn src.app:app --host 127.0.0.1 --port 8000 --reload
@@ -98,7 +100,7 @@ uvicorn src.app:app --host 127.0.0.1 --port 8000 --reload
 
 ---
 
-## 🐳 Docker Deployment (The "Pro" Way)
+## 🐳 Docker Deployment
 
 FinVision is optimized for Docker. Build and run it anywhere without dependency issues.
 
@@ -126,7 +128,8 @@ The project is deployed live on Hugging Face Spaces.
 ## 🧠 How It Works (The "Real AI" Logic)
 
 1. **Ingestion:** User uploads a scanned `.png`, `.jpg` or `.pdf` via the Drag & Drop interface.
-2. **Pre-processing:** * **PDFs:** Converted to high-res images using `pdf2image` & `poppler`.
+2. **Pre-processing:**
+* **PDFs:** Converted to high-res images using `pdf2image` & `poppler`.
 * **Images:** OpenCV converts to grayscale and applies adaptive thresholding to remove noise.
 
 

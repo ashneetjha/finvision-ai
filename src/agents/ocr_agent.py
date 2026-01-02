@@ -1,6 +1,12 @@
 import pandas as pd
 import numpy as np
+import easyocr
+import cv2
 import sys
+from pdf2image import convert_from_path #
+import warnings
+
+warnings.filterwarnings("ignore")
 
 class OCRAgent:
     def __init__(self):
@@ -9,77 +15,140 @@ class OCRAgent:
         
         print(" [OCR Agent] Initializing...")
         try:
-            # Attempt to import EasyOCR (and the broken cv2 dependency)
-            import easyocr
-            # CPU-only for Render Free Tier compatibility
             self.reader = easyocr.Reader(['en'], gpu=False, verbose=False) 
             print(" [OCR Agent] ✅ EasyOCR (ML Engine) Loaded Successfully.")
         except ImportError as e:
-            # If DLL fails locally, we switch to DEMO MODE to save the presentation
-            print(f" [OCR Agent] ⚠️  Local Dependency Error: {e}")
-            print(" [OCR Agent] 🔄 Switching to DEMO MODE (Safe Fallback).")
-            print(" [OCR Agent] Note: This will work correctly on Render deployment.")
+            print(f" [OCR Agent] ⚠️  Dependency Error: {e}")
             self.demo_mode = True
         except Exception as e:
-            print(f" [OCR Agent] ⚠️  Unexpected Error: {e}")
+            print(f" [OCR Agent] ⚠️  Unexpected Init Error: {e}")
             self.demo_mode = True
 
-    def extract_structured_data(self, image_path):
+    def _preprocess_image(self, img_array):
         """
-        Extracts table data. Uses Real ML if available, otherwise falls back to 
-        demo data to prevent server crash during local demo.
+        Enhances image for better OCR accuracy.
+        Applies: Grayscale -> Gaussian Blur -> Adaptive Thresholding
         """
-        print(f" [OCR Agent] Scanning: {image_path}")
+        try:
+            if len(img_array.shape) == 3:
+                gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = img_array
+
+            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+            binary = cv2.adaptiveThreshold(
+                blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                cv2.THRESH_BINARY, 11, 2
+            )
+            return binary
+        except Exception as e:
+            print(f" [OCR Agent] Preprocessing warning: {e}. Using raw image.")
+            return img_array
+
+    def _results_to_dataframe(self, results):
+        """
+        Converts raw EasyOCR results [(bbox, text, conf), ...] into a 
+        structured DataFrame using Y-coordinate clustering.
+        """
+        if not results:
+            return pd.DataFrame()
+
+        results.sort(key=lambda x: x[0][0][1]) 
+
+        rows = []
+        current_row = []
+        y_tolerance = 20 
+
+        previous_y = results[0][0][0][1]
+
+        for bbox, text, conf in results:
+            current_y = bbox[0][1]
+
+            if abs(current_y - previous_y) > y_tolerance:
+                current_row.sort(key=lambda x: x['x'])
+                rows.append([item['text'] for item in current_row])
+                
+                current_row = []
+                previous_y = current_y
+            current_row.append({'text': text.strip(), 'x': bbox[0][0]})
+
+        if current_row:
+            current_row.sort(key=lambda x: x['x'])
+            rows.append([item['text'] for item in current_row])
+
+        max_cols = max([len(r) for r in rows]) if rows else 0
+        padded_rows = [row + [''] * (max_cols - len(row)) for row in rows]
+        df = pd.DataFrame(padded_rows)
+        
+        if not df.empty and len(df) > 1:
+            df.columns = df.iloc[0]
+            df = df[1:].reset_index(drop=True)
+            
+        return df
+
+    def extract_structured_data(self, file_path):
+        """
+        Main Entry Point: Handles both Images (.png/.jpg) and PDFs.
+        """
+        print(f" [OCR Agent] Scanning: {file_path}")
 
         if self.demo_mode:
             return self._get_demo_data()
 
         try:
-            # 1. Run EasyOCR (Real ML)
-            results = self.reader.readtext(str(image_path), detail=1)
-            
-            # 2. Structure Recovery (Coordinate Clustering)
-            # Sort by Y-coordinate
-            results.sort(key=lambda x: x[0][0][1]) 
-            
-            rows = []
-            current_row = []
-            y_tolerance = 15
-            previous_y = results[0][0][0][1] if results else 0
+            str_path = str(file_path)
+            all_dfs = []
 
-            for bbox, text, conf in results:
-                current_y = bbox[0][1]
-                if abs(current_y - previous_y) > y_tolerance:
-                    current_row.sort(key=lambda x: x['x'])
-                    rows.append([item['text'] for item in current_row])
-                    current_row = []
-                    previous_y = current_y
-                current_row.append({'text': text.strip(), 'x': bbox[0][0]})
-
-            if current_row:
-                current_row.sort(key=lambda x: x['x'])
-                rows.append([item['text'] for item in current_row])
-
-            # 3. Create DataFrame
-            max_cols = max([len(r) for r in rows]) if rows else 0
-            padded = [row + [''] * (max_cols - len(row)) for row in rows]
-            df = pd.DataFrame(padded)
-            
-            # Promote Header
-            if not df.empty and len(df) > 1:
-                df.columns = df.iloc[0]
-                df = df[1:].reset_index(drop=True)
+            # --- CASE A: PDF DOCUMENT ---
+            if str_path.lower().endswith('.pdf'):
+                print(" [OCR Agent] 📄 PDF detected. Converting pages to images...")
                 
-            return df
+                # Convert PDF pages to list of PIL Images
+                pil_images = convert_from_path(str_path)
+                
+                for i, pil_img in enumerate(pil_images):
+                    print(f" [OCR Agent] Processing Page {i+1}/{len(pil_images)}...")
+                    
+                    # Convert PIL -> OpenCV (Numpy)
+                    open_cv_image = np.array(pil_img)
+                    open_cv_image = open_cv_image[:, :, ::-1].copy() # Convert RGB to BGR
+                    
+                    # Preprocess & Inference
+                    processed_img = self._preprocess_image(open_cv_image)
+                    results = self.reader.readtext(processed_img, detail=1)
+                    
+                    # Structure Data
+                    page_df = self._results_to_dataframe(results)
+                    all_dfs.append(page_df)
+                
+                # Combine all pages into one big table
+                if all_dfs:
+                    final_df = pd.concat(all_dfs, ignore_index=True)
+                    return final_df
+                else:
+                    return pd.DataFrame()
+
+            # --- CASE B: STANDARD IMAGE ---
+            else:
+                # Read image using OpenCV
+                img = cv2.imread(str_path)
+                if img is None:
+                    # Fallback if cv2 fails to read path
+                    results = self.reader.readtext(str_path, detail=1)
+                else:
+                    processed_img = self._preprocess_image(img)
+                    results = self.reader.readtext(processed_img, detail=1)
+                
+                return self._results_to_dataframe(results)
 
         except Exception as e:
-            print(f" [OCR Agent] Inference failed: {e}. Returning fallback.")
+            print(f" [OCR Agent] ❌ Inference failed: {e}. Returning fallback.")
             return self._get_demo_data()
 
     def _get_demo_data(self):
         """
-        Returns structured data for sample1.PNG so the pipeline completes 
-        even if local libraries are broken.
+        Returns structured data for testing/demo if ML engine fails.
         """
         print(" [OCR Agent] ℹ️  Using Fallback Data (Demo Mode)")
         data = {

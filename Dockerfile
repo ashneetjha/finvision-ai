@@ -5,6 +5,7 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # 1. Install system dependencies
+# ADDED: poppler-utils (Critical for PDF conversion)
 # We keep your correct fix for Debian Bookworm (libgl1 instead of libgl1-mesa-glx)
 RUN apt-get update && apt-get install -y \
     libgl1 \
@@ -13,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender1 \
     git \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Copy dependencies first (for caching)

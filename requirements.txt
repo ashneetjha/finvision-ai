@@ -9,3 +9,4 @@ jinja2
 python-multipart
 openpyxl
 python-Levenshtein
+pdf2image
