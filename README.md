@@ -1,8 +1,3 @@
-Here is the refined and polished **`README.md`** file, formatted correctly for direct copy-pasting into your repository.
-
-I have aligned the formatting, fixed the indentation for lists, and ensured the headers and code blocks are clean.
-
-```markdown
 # 🦅 FinVision AI
 ### Intelligent Document Digitization & Financial Validation System
 
