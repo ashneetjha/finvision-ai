@@ -1,4 +1,4 @@
-# 🦅 FinVision AI
+#  FinVision AI
 ### Intelligent Document Digitization & Financial Validation System
 
 [![Deployment](https://img.shields.io/badge/Deployment-Hugging%20Face%20Spaces-yellow?style=for-the-badge&logo=huggingface)](https://huggingface.co/spaces/ashneetjha/FinVision-AI)
